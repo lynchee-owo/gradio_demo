@@ -52,7 +52,10 @@ def create_pdf(text, filename="output.pdf"):
     pdf.chapter_body(text)
     pdf.output(filename)
 
-def process_image(image):
+def process_image(image, user_prompt=None):
+    if user_prompt is None or user_prompt == "":
+        user_prompt = "Improve the following class notes to be well-structured and add a title and a summary. If the following class notes is in English, return the improved notes in English. If the class notes is in Mandarin, return the improved notes in Mandarin"
+
     start_time = time.time()
     # Convert numpy array to PIL Image
     image = Image.fromarray((image * 255).astype(np.uint8))
@@ -83,7 +86,7 @@ def process_image(image):
     # Extract the recognized text
     if result.status == OperationStatusCodes.succeeded:
         text = "\n".join([line.text for line in result.analyze_result.read_results[0].lines])
-        prompt = "Improve the following class notes to be well-structured and add a title and a summary:\n" + text
+        prompt = user_prompt + ":\n" + text
 
         # Use OpenAI to generate a completion based on the recognized text
         response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
@@ -93,12 +96,19 @@ def process_image(image):
         # Create a PDF with the response text
         create_pdf(response_text)
 
-        return response_text, "output.pdf"
+        return text, response_text, "output.pdf"
 
 iface = gr.Interface(
     fn=process_image,
-    inputs="image",
-    outputs=[Textbox(label="Response Text"), File(label="Download PDF")],
-    interpretation="default",
+    inputs=[
+        gr.components.Image(label="上传图片"), 
+        Textbox(lines=2, label="输入你的提示", info="默认提示: Improve the following class notes to be well-structured and add a title and a summary. If the following class notes is in English, return the improved notes in English. If the class notes is in Mandarin, return the improved notes in Mandarin")
+    ],
+    outputs=[
+        Textbox(label="初始笔记"), 
+        Textbox(label="改进笔记"), 
+        File(label="下载笔记")
+    ],
+    allow_flagging="never",
 )
 iface.launch(share=True)
